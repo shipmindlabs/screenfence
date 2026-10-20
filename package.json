@@ -1,0 +1,38 @@
+{
+  "name": "screenfence",
+  "version": "0.1.0",
+  "description": "Separate the visible page of a candidate document from hidden text layers before an AI screener reads it.",
+  "keywords": [
+    "hiring",
+    "prompt-injection",
+    "document-inspection",
+    "accessibility",
+    "contrast"
+  ],
+  "license": "MIT",
+  "author": "Shipmind Labs <hello@shipmindlabs.com>",
+  "homepage": "https://shipmindlabs.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shipmindlabs/screenfence.git"
+  },
+  "bugs": {
+    "url": "https://github.com/shipmindlabs/screenfence/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  }
+}
