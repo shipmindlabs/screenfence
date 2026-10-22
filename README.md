@@ -53,11 +53,39 @@ traced back to the document it came from.
 The background defaults to `#ffffff` when a run does not declare one. Colours parse as `#rgb`,
 `#rrggbb`, `rgb()` / `rgba()` with 0-255 channels, the basic CSS colour names, and `auto`.
 
+## Routing
+
+`route(findings, coverage)` turns an inspection into a decision. There are two kinds and only two:
+
+```ts
+import { coverageOf, route } from 'screenfence';
+
+const decision = route(findings, coverageOf(runs));
+```
+
+| Input | Route |
+| --- | --- |
+| any review-tier finding | `human-review`, priority `high`, carrying the findings that caused it |
+| no review-tier finding but an unreadable run | `human-review`, priority `standard` |
+| info-tier findings only, every run readable | `no-findings` with `checked` / `notChecked` |
+
+There is no reject kind, and `route` takes no threshold and no options, so no caller can turn a
+finding into a rejection. A suspicious document is handed to a person; screenfence never decides
+against a candidate.
+
+`no-findings` is explicit about what was actually inspected. `text-behind-image`, `off-page-frame`,
+`image-colour-match` and `overpainted-shape` are always in `notChecked` — screenfence reads styled
+runs, not page geometry. A plain-text input adds `layer-separation`, because there are no styles to
+separate.
+
 ## Tests
 
 ```sh
 node --test test/*.test.ts
 ```
+
+`test/route.types.ts` is checked by `tsc --noEmit` rather than run: it asserts that a `reject`
+route does not type-check.
 
 Requires Node >= 22.18.
 
