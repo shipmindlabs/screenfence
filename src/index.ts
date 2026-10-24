@@ -20,6 +20,8 @@ export type {
   Segment,
   Verdict,
 } from './layers.ts';
+export { CODE_POINT_TIERS, codePointFindings, scanCodePoints } from './codepoints.ts';
+export type { CodePointFinding, CodePointTier } from './codepoints.ts';
 export { CONSTRUCTS, FINDING_TIERS, ROUTE_KINDS, coverageOf, route } from './route.ts';
 export type {
   Construct,
