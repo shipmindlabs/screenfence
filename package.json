@@ -1,13 +1,15 @@
 {
   "name": "screenfence",
   "version": "0.1.0",
-  "description": "Separate the visible page of a candidate document from hidden text layers before an AI screener reads it.",
+  "description": "Separate the visible page of a candidate document from hidden text layers and invisible code points before an AI screener reads it.",
   "keywords": [
     "hiring",
     "prompt-injection",
     "document-inspection",
     "accessibility",
-    "contrast"
+    "contrast",
+    "unicode",
+    "zero-width"
   ],
   "license": "MIT",
   "author": "Shipmind Labs <hello@shipmindlabs.com>",
