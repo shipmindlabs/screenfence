@@ -50,7 +50,11 @@ test('info-tier findings alone give no-findings', () => {
   const decision = route([info], styled);
 
   assert.ok(decision.kind === 'no-findings');
-  assert.deepEqual(decision.checked, ['layer-separation', 'invisible-code-points']);
+  assert.deepEqual(decision.checked, [
+    'layer-separation',
+    'invisible-code-points',
+    'tag-characters',
+  ]);
   assert.deepEqual(decision.notChecked, ALWAYS_UNCHECKED);
 });
 
@@ -90,7 +94,7 @@ test('a plain-text input adds layer-separation to notChecked', () => {
   const decision = route([], coverage);
 
   assert.ok(decision.kind === 'no-findings');
-  assert.deepEqual(decision.checked, ['invisible-code-points']);
+  assert.deepEqual(decision.checked, ['invisible-code-points', 'tag-characters']);
   assert.deepEqual(decision.notChecked, ['layer-separation', ...ALWAYS_UNCHECKED]);
 });
 

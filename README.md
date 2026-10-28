@@ -99,6 +99,36 @@ Anything else is flagged by name: a joiner between Latin letters, a joiner acros
 joiner in a script that does not spell with one, a trailing joiner, or a keycap selector with no
 enclosing keycap.
 
+## Tag characters
+
+Tag characters (`U+E0000`-`U+E007F`) are invisible, and `U+E0020`-`U+E007E` are a shadow copy of
+printable ASCII, so a whole instruction can travel through a document as tags. `scanTags(text)`
+finds the runs of them in a layer's text — not inside a single styled run, so a payload a DOCX
+splits across two runs is still decoded whole — and `tagFindings(text, locateOffset?)` reports
+them as `Finding` objects under the `tag-characters` construct.
+
+```ts
+import { scanTags, tagFindings, tagPayloadSegments } from 'screenfence';
+
+scanTags('Experience\u{e0068}\u{e0069}');
+// [{ start: 10, end: 14, chars: [...], payload: 'hi', subdivisionFlag: false }]
+
+tagFindings('Experience\u{e0068}\u{e0069}');
+// [{ construct: 'tag-characters', tier: 'review', summary: 'tag-payload "hi" at offsets 10-14' }]
+```
+
+A run is left alone only when it is a subdivision flag: it directly follows `U+1F3F4`, holds tag
+letters or digits only and ends with `U+E007F` — the flags of England, Scotland and Wales. Every
+other run is decoded and reported verbatim at `review` tier with the offsets it came from, so a
+reviewer reads the smuggled sentence itself. `U+E0001` and a cancel tag that closes nothing are
+reported by name (`language-tag`, `cancel-tag`), and the remaining unassigned tag code points as
+`reserved-tag-character`. A flag sequence with a payload glued onto its end is one run, so the
+suffix is decoded along with the subdivision letters instead of hiding behind them.
+
+`tagPayloadSegments(text)` hands the decoded payloads on as hidden segments
+(`{ text, start, end }`), so later checks — instruction matching in particular — see the ASCII
+sentence rather than the invisible characters that carried it.
+
 ## Routing
 
 `route(findings, coverage)` turns an inspection into a decision. There are two kinds and only two:

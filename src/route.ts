@@ -9,6 +9,7 @@ export type RouteKind = (typeof ROUTE_KINDS)[number];
 export const CONSTRUCTS = [
   'layer-separation',
   'invisible-code-points',
+  'tag-characters',
   'text-behind-image',
   'off-page-frame',
   'image-colour-match',

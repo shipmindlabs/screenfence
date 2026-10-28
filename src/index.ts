@@ -22,6 +22,8 @@ export type {
 } from './layers.ts';
 export { CODE_POINT_TIERS, codePointFindings, scanCodePoints } from './codepoints.ts';
 export type { CodePointFinding, CodePointTier } from './codepoints.ts';
+export { scanTags, tagFindings, tagPayloadSegments } from './tags.ts';
+export type { TagChar, TagPayloadSegment, TagRun } from './tags.ts';
 export { CONSTRUCTS, FINDING_TIERS, ROUTE_KINDS, coverageOf, route } from './route.ts';
 export type {
   Construct,
