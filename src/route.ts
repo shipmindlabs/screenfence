@@ -10,6 +10,7 @@ export const CONSTRUCTS = [
   'layer-separation',
   'invisible-code-points',
   'tag-characters',
+  'instruction-text',
   'text-behind-image',
   'off-page-frame',
   'image-colour-match',
@@ -25,7 +26,7 @@ const UNCHECKED_CONSTRUCTS: readonly Construct[] = [
   'overpainted-shape',
 ];
 
-export const FINDING_TIERS = ['info', 'review'] as const;
+export const FINDING_TIERS = ['info', 'notice', 'review'] as const;
 
 export type FindingTier = (typeof FINDING_TIERS)[number];
 
@@ -94,6 +95,12 @@ export const route = (findings: readonly Finding[], coverage: Coverage): Route =
 
   if (causes.length > 0) {
     return { kind: 'human-review', priority: 'high', findings: causes };
+  }
+
+  const notices = findings.filter((finding) => finding.tier === 'notice');
+
+  if (notices.length > 0) {
+    return { kind: 'human-review', priority: 'standard', findings: notices };
   }
 
   if (coverage.unknownRuns > 0) {

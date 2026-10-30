@@ -24,6 +24,21 @@ export { CODE_POINT_TIERS, codePointFindings, scanCodePoints } from './codepoint
 export type { CodePointFinding, CodePointTier } from './codepoints.ts';
 export { scanTags, tagFindings, tagPayloadSegments } from './tags.ts';
 export type { TagChar, TagPayloadSegment, TagRun } from './tags.ts';
+export {
+  INSTRUCTION_SITES,
+  PHRASES_V1,
+  PHRASE_CATEGORIES,
+  matchPhrases,
+  phraseFindings,
+  phraseScopes,
+} from './phrases.ts';
+export type {
+  InstructionSite,
+  Phrase,
+  PhraseCategory,
+  PhraseMatch,
+  PhraseScope,
+} from './phrases.ts';
 export { CONSTRUCTS, FINDING_TIERS, ROUTE_KINDS, coverageOf, route } from './route.ts';
 export type {
   Construct,

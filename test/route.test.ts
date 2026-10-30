@@ -29,6 +29,12 @@ const info: Finding = {
   summary: 'hidden layer is empty',
 };
 
+const notice: Finding = {
+  construct: 'instruction-text',
+  tier: 'notice',
+  summary: 'override.ignore-previous-instructions in the visible layer',
+};
+
 const review: Finding = {
   construct: 'invisible-code-points',
   tier: 'review',
@@ -54,12 +60,29 @@ test('info-tier findings alone give no-findings', () => {
     'layer-separation',
     'invisible-code-points',
     'tag-characters',
+    'instruction-text',
   ]);
   assert.deepEqual(decision.notChecked, ALWAYS_UNCHECKED);
 });
 
 test('a review-tier finding gives human-review carrying that finding', () => {
   const decision = route([info, review], styled);
+
+  assert.ok(decision.kind === 'human-review');
+  assert.equal(decision.priority, 'high');
+  assert.deepEqual(decision.findings, [review]);
+});
+
+test('a notice-tier finding gives human-review at standard priority', () => {
+  const decision = route([info, notice], styled);
+
+  assert.ok(decision.kind === 'human-review');
+  assert.equal(decision.priority, 'standard');
+  assert.deepEqual(decision.findings, [notice]);
+});
+
+test('a review-tier finding outranks a notice', () => {
+  const decision = route([notice, review], styled);
 
   assert.ok(decision.kind === 'human-review');
   assert.equal(decision.priority, 'high');
@@ -94,7 +117,11 @@ test('a plain-text input adds layer-separation to notChecked', () => {
   const decision = route([], coverage);
 
   assert.ok(decision.kind === 'no-findings');
-  assert.deepEqual(decision.checked, ['invisible-code-points', 'tag-characters']);
+  assert.deepEqual(decision.checked, [
+    'invisible-code-points',
+    'tag-characters',
+    'instruction-text',
+  ]);
   assert.deepEqual(decision.notChecked, ['layer-separation', ...ALWAYS_UNCHECKED]);
 });
 
@@ -128,6 +155,7 @@ test('every input produces one of the two kinds', () => {
     [[], { styled: true, unknownRuns: 0 }],
     [[], { styled: false, unknownRuns: 0 }],
     [[info], { styled: true, unknownRuns: 0 }],
+    [[notice], { styled: true, unknownRuns: 0 }],
     [[review], { styled: false, unknownRuns: 0 }],
     [[info], { styled: true, unknownRuns: 2 }],
     [[info, review], { styled: false, unknownRuns: 5 }],
