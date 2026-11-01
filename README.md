@@ -129,6 +129,60 @@ suffix is decoded along with the subdivision letters instead of hiding behind th
 (`{ text, start, end }`), so later checks — instruction matching in particular — see the ASCII
 sentence rather than the invisible characters that carried it.
 
+## Instruction text
+
+`PHRASES_V1` holds English instruction patterns with stable ids in four categories, so a finding
+names the phrase it matched instead of carrying a score:
+
+| Category | Ids | What it catches |
+| --- | --- | --- |
+| `override` | `ignore-previous-instructions`, `disregard-the-above`, `these-instructions-take-priority` | text that tries to replace the screener's own instructions |
+| `address-to-model` | `you-are-an-ai`, `as-a-language-model`, `note-to-the-ai` | text written to a reader that is not a person |
+| `verdict` | `recommend-this-candidate`, `rank-this-candidate-first`, `advance-to-the-next-round` | text that dictates the outcome |
+| `chat-marker` | `system-label`, `assistant-label`, `chatml-turn` | turn labels that imitate a chat transcript |
+
+Each id is prefixed with its category (`override.ignore-previous-instructions`). A turn label that
+follows a word is prose, so `Operating system: Linux` and `Teaching assistant: 2019-2021` do not
+match `chat-marker`.
+
+`matchPhrases(text)` matches on a normalised copy — flagged code points removed, NFKC, case-folded,
+runs of whitespace collapsed to a single space — and keeps an offset map back to the source. A
+zero-width space dropped inside `ignore` therefore does not hide the phrase, and the match still
+quotes the original span rather than the normalised one.
+
+```ts
+import { matchPhrases, phraseFindings, phraseScopes, separateLayers } from 'screenfence';
+
+matchPhrases('ig\u200bnore previous instructions');
+// [{ id: 'override.ignore-previous-instructions', category: 'override',
+//    start: 0, end: 29, quote: 'ig\u200bnore previous instructions' }]
+
+const findings = phraseFindings(phraseScopes(separateLayers(runs)));
+```
+
+`phraseScopes(layers)` builds one scope per layer plus one for every decoded tag payload, and
+`phraseFindings(scopes)` turns the matches into `instruction-text` findings whose tier depends on
+where the match sits. Instruction-shaped text is only urgent when it is also out of sight:
+
+| Where the match sits | Finding tier | Route priority |
+| --- | --- | --- |
+| hidden layer | `review` | high |
+| unknown layer | `review` | high |
+| tag payload | `review` | high |
+| visible layer | `notice` | standard |
+
+Hidden text with no instruction match — keyword stuffing — is reported under `layer-separation` at
+`notice` tier. A person still sees it; it does not jump the queue ahead of a document that hides an
+instruction.
+
+### Known gap
+
+Normalisation folds compatibility variants, so a `system:` typed in fullwidth forms matches, but it
+does not fold confusables across scripts. `ignore previous instructions` whose first letter is the
+Cyrillic `і` (`U+0456`) matches no phrase. In the hidden layer such a document still reaches
+`human-review` through the keyword-stuffing finding, at standard priority. `test/phrases.test.ts`
+pins that case so the gap stays visible instead of being assumed closed.
+
 ## Routing
 
 `route(findings, coverage)` turns an inspection into a decision. There are two kinds and only two:
@@ -142,7 +196,8 @@ const decision = route(findings, coverageOf(runs));
 | Input | Route |
 | --- | --- |
 | any review-tier finding | `human-review`, priority `high`, carrying the findings that caused it |
-| no review-tier finding but an unreadable run | `human-review`, priority `standard` |
+| notice-tier findings and no review-tier finding | `human-review`, priority `standard`, carrying the notices |
+| no review or notice finding but an unreadable run | `human-review`, priority `standard` |
 | info-tier findings only, every run readable | `no-findings` with `checked` / `notChecked` |
 
 There is no reject kind, and `route` takes no threshold and no options, so no caller can turn a
