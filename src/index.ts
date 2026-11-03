@@ -51,3 +51,12 @@ export type {
   Route,
   RouteKind,
 } from './route.ts';
+export {
+  ZIP_LIMITS,
+  ZIP_REFUSAL_CODES,
+  ZipRefusal,
+  crc32,
+  findPart,
+  readZip,
+} from './docx/zip.ts';
+export type { ZipEntry, ZipLimits, ZipRefusalCode } from './docx/zip.ts';
