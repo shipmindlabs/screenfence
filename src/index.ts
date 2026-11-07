@@ -60,3 +60,19 @@ export {
   readZip,
 } from './docx/zip.ts';
 export type { ZipEntry, ZipLimits, ZipRefusalCode } from './docx/zip.ts';
+export {
+  WORDPROCESSINGML_NAMESPACES,
+  XML_LIMITS,
+  XML_REFUSAL_CODES,
+  XmlRefusal,
+  canonicalName,
+  readXml,
+} from './docx/xml.ts';
+export type {
+  QName,
+  XmlAttribute,
+  XmlLimits,
+  XmlOptions,
+  XmlRefusalCode,
+  XmlToken,
+} from './docx/xml.ts';
