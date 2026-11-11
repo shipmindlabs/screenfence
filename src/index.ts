@@ -76,3 +76,19 @@ export type {
   XmlRefusalCode,
   XmlToken,
 } from './docx/xml.ts';
+export {
+  CASCADE_LEVELS,
+  CASCADE_REFUSAL_CODES,
+  CascadeRefusal,
+  UNKNOWN_REASONS,
+  UNRESOLVED_COLOR,
+  mainPartName,
+  resolveRuns,
+  styledRunsOf,
+} from './docx/cascade.ts';
+export type {
+  CascadeLevel,
+  CascadeRefusalCode,
+  ResolvedRun,
+  UnknownReason,
+} from './docx/cascade.ts';
