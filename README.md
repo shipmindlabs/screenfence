@@ -54,6 +54,75 @@ traced back to the document it came from.
 The background defaults to `#ffffff` when a run does not declare one. Colours parse as `#rgb`,
 `#rrggbb`, `rgb()` / `rgba()` with 0-255 channels, the basic CSS colour names, and `auto`.
 
+## DOCX packages
+
+`resolveRuns` turns a DOCX package into the styled runs the rest of the library reads. The archive
+is opened with `readZip`, each part is tokenised with `readXml`, and the main document part is
+located through `_rels/.rels` instead of being assumed to be `word/document.xml`.
+
+```ts
+import { coverageOf, readZip, resolveRuns, route, separateLayers, styledRunsOf } from 'screenfence';
+
+const runs = styledRunsOf(resolveRuns(await readZip(bytes)));
+const layers = separateLayers(runs);
+const decision = route([], coverageOf(runs));
+```
+
+A run's appearance is not in `document.xml` alone. Every run resolves through four levels in the
+order `docDefaults`, paragraph style, character style, direct `w:rPr`, and each level overrides the
+one before it — white text applied only through a character style in `styles.xml` still lands in
+the hidden layer. A style's `w:basedOn` chain applies from the root down, and a chain that returns
+to a style it already visited is refused rather than cut short at an arbitrary depth.
+
+| Property | Reading |
+| --- | --- |
+| `w:color` | `w:themeColor` supersedes `w:val`; `auto` is kept as `auto` and is never hidden |
+| `w:sz` | half-points, so `w:sz="4"` is two-point type and lands in the hidden layer |
+| `w:vanish` | a direct off overrides a style that sets it |
+| `w:shd` | `clear` uses `w:fill`, `solid` uses `w:color`, `pctN` blends the two |
+| background | run `w:shd`, then `w:highlight`, paragraph `w:shd`, table-cell `w:shd`, page `w:background` |
+
+Theme colours come from the theme part and are mapped through `w:clrSchemeMapping` in
+`settings.xml`: `w:themeColor="text1"` reads `a:dk1` by default, and `a:lt1` where the mapping
+sends `w:t1` to `light1`. `w:themeTint` and `w:themeShade` are hex fractions of 255 that blend the
+slot colour towards white or towards black.
+
+### What is refused
+
+`CascadeRefusal` is thrown when the package does not say which document to read:
+
+| Code | Meaning |
+| --- | --- |
+| `no-package-rels` | the package carries no `_rels/.rels` |
+| `no-main-part` | no internal relationship names the main part, or it is not in the package |
+| `style-cycle` | a `w:basedOn` chain returns to a style it already visited |
+
+The layers underneath refuse on their own terms: `readZip` throws `ZipRefusal` for an encrypted,
+zip64, overlapping or over-expanding archive (at most 256 entries, 32 MiB inflated, 200× per
+entry), and `readXml` throws `XmlRefusal` for a DOCTYPE, an entity reference, an unbound prefix, a
+document element outside WordprocessingML, or nesting past 64 levels. Character references are
+decoded before any text leaves the tokenizer, so a `&#x200b;` reaches the code-point scan as the
+character it denotes.
+
+### What is unknown
+
+A run the cascade cannot read with confidence keeps no colour of its own: `styledRunsOf` gives it
+`color: 'unresolved'`, which no ruleset parses, so it lands in the `unknown` layer and `route`
+hands the document to a person. `ResolvedRun.unknown` names the reasons.
+
+| Reason | When |
+| --- | --- |
+| `theme-part-missing` | the run points at a theme slot the package does not carry, even when `w:val` is black |
+| `unreadable-color` | `w:val` is not a colour |
+| `unreadable-size` | `w:sz` is not a number of half-points |
+| `unreadable-shading` | the shading pattern is neither `clear`, `solid` nor `pctN` |
+| `unreadable-highlight` | the highlight is not one of the named ones |
+| `vanish-toggle-disagreement` | `w:vanish` is set at two style levels, where the ECMA-376 toggle reading and Word's documented behaviour in [MS-OI29500] part company |
+| `background-shape-dependent` | the run's layer differs with and without `w:displayBackgroundShape` |
+| `narrow-character-scaling` | `w:w` scales the characters below 25% |
+| `condensed-spacing` | `w:spacing` condenses by more than half the font size |
+| `raised-text` | `w:position` moves the run beyond twice the font size |
+
 ## Invisible code points
 
 `scanCodePoints(text)` walks the text one code point at a time and reports every character a reader
