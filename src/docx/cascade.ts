@@ -1,7 +1,18 @@
 import { RULESET_V1, classifyRun } from '../layers.ts';
 import type { SourceSpan, Style, StyledRun } from '../runs.ts';
-import { WORDPROCESSINGML_NAMESPACES, readXml } from './xml.ts';
-import type { QName } from './xml.ts';
+import {
+  NS_DRAWING,
+  NS_PACKAGE_RELS,
+  attrOf,
+  childOf,
+  childrenOf,
+  dirOf,
+  onOff,
+  parseTree,
+  textOf,
+} from './tree.ts';
+import type { Element } from './tree.ts';
+import { WORDPROCESSINGML_NAMESPACES } from './xml.ts';
 import { findPart } from './zip.ts';
 import type { ZipEntry } from './zip.ts';
 
@@ -58,119 +69,53 @@ export const UNRESOLVED_COLOR = 'unresolved';
 
 const DEFAULT_SIZE_PT = 10;
 
-const NS_PACKAGE_RELS = [
-  'http://schemas.openxmlformats.org/package/2006/relationships',
-  'http://purl.oclc.org/ooxml/package/relationships',
-] as const;
+export type Relationship = { id: string; type: string; target: string; external: boolean };
 
-const NS_OFFICE_RELS = [
-  'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
-  'http://purl.oclc.org/ooxml/officeDocument/relationships',
-] as const;
-
-const NS_DRAWING = [
-  'http://schemas.openxmlformats.org/drawingml/2006/main',
-  'http://purl.oclc.org/ooxml/drawingml/main',
-] as const;
-
-const PREFIXES = new Map<string, string>([
-  ...WORDPROCESSINGML_NAMESPACES.map((uri): [string, string] => [uri, 'w']),
-  ...NS_DRAWING.map((uri): [string, string] => [uri, 'a']),
-  ...NS_OFFICE_RELS.map((uri): [string, string] => [uri, 'r']),
-  ...NS_PACKAGE_RELS.map((uri): [string, string] => [uri, 'rel']),
-]);
-
-const named = (name: QName): string => {
-  if (name.ns === null) {
-    return name.local;
+export const relationshipsOf = (
+  parts: readonly ZipEntry[],
+  relsName: string,
+  base: string,
+): Relationship[] => {
+  const rels = findPart(parts, relsName);
+  if (rels === null) {
+    return [];
   }
-  const prefix = PREFIXES.get(name.ns);
-  return prefix === undefined ? `{${name.ns}}${name.local}` : `${prefix}:${name.local}`;
-};
 
-type Element = { name: string; attributes: Map<string, string>; children: Element[]; text: string };
+  const root = parseTree(textOf(rels), NS_PACKAGE_RELS);
+  const found: Relationship[] = [];
 
-const parseTree = (xml: string, roots: readonly string[]): Element => {
-  const root: Element = { name: '', attributes: new Map(), children: [], text: '' };
-  const stack: Element[] = [root];
-
-  for (const token of readXml(xml, { rootNamespaces: roots })) {
-    const top = stack[stack.length - 1];
-    if (top === undefined) {
-      break;
-    }
-    if (token.kind === 'text') {
-      top.text += token.text;
+  for (const relationship of childrenOf(root, 'rel:Relationship')) {
+    const target = relationship.attributes.get('Target');
+    if (target === undefined) {
       continue;
     }
-    if (token.kind === 'end') {
-      stack.pop();
-      continue;
-    }
-    const child: Element = {
-      name: named(token.name),
-      attributes: new Map(token.attributes.map((a): [string, string] => [named(a.name), a.value])),
-      children: [],
-      text: '',
-    };
-    top.children.push(child);
-    if (!token.selfClosing) {
-      stack.push(child);
-    }
+    const external = (relationship.attributes.get('TargetMode') ?? 'Internal') === 'External';
+    const inside = target.startsWith('/') ? target.slice(1) : `${base}${target}`;
+    found.push({
+      id: relationship.attributes.get('Id') ?? '',
+      type: relationship.attributes.get('Type') ?? '',
+      target: external ? target : inside,
+      external,
+    });
   }
 
-  return root.children[0] ?? root;
+  return found;
 };
 
-const childOf = (parent: Element | null, name: string): Element | null =>
-  parent === null ? null : (parent.children.find((child) => child.name === name) ?? null);
-
-const childrenOf = (parent: Element | null, name: string): Element[] =>
-  parent === null ? [] : parent.children.filter((child) => child.name === name);
-
-const attrOf = (owner: Element | null, name: string): string | null =>
-  owner === null ? null : (owner.attributes.get(name) ?? null);
-
-const OFF = new Set(['0', 'false', 'off']);
-
-const onOff = (owner: Element | null): boolean | null => {
-  if (owner === null) {
-    return null;
-  }
-  const value = owner.attributes.get('w:val');
-  return value === undefined ? true : !OFF.has(value.toLowerCase());
+export const relsNameFor = (partName: string): string => {
+  const base = dirOf(partName);
+  return `${base}_rels/${partName.slice(base.length)}.rels`;
 };
-
-const decoder = new TextDecoder();
-
-const textOf = (part: ZipEntry): string => decoder.decode(part.bytes);
-
-const dirOf = (name: string): string => name.slice(0, name.lastIndexOf('/') + 1);
 
 const relationshipTarget = (
   parts: readonly ZipEntry[],
   relsName: string,
   base: string,
   suffix: string,
-): string | null => {
-  const rels = findPart(parts, relsName);
-  if (rels === null) {
-    return null;
-  }
-
-  const root = parseTree(textOf(rels), NS_PACKAGE_RELS);
-
-  for (const relationship of childrenOf(root, 'rel:Relationship')) {
-    const type = relationship.attributes.get('Type') ?? '';
-    const target = relationship.attributes.get('Target');
-    const mode = relationship.attributes.get('TargetMode') ?? 'Internal';
-    if (type.endsWith(`/${suffix}`) && target !== undefined && mode === 'Internal') {
-      return target.startsWith('/') ? target.slice(1) : `${base}${target}`;
-    }
-  }
-
-  return null;
-};
+): string | null =>
+  relationshipsOf(parts, relsName, base).find(
+    (relationship) => !relationship.external && relationship.type.endsWith(`/${suffix}`),
+  )?.target ?? null;
 
 const HEX = /^[0-9a-f]{6}$/;
 const PERCENT = /^pct([0-9]+)$/;
@@ -580,7 +525,15 @@ const RUN_CONTAINERS = new Set([
   'w:dir',
 ]);
 
-const BODY_CONTAINERS = new Set(['w:sdt', 'w:sdtContent', 'w:customXml']);
+// w:footnote and w:endnote wrap the paragraphs of their own part, so the walk reaches them the way
+// it reaches a content control in the body.
+const BODY_CONTAINERS = new Set([
+  'w:sdt',
+  'w:sdtContent',
+  'w:customXml',
+  'w:footnote',
+  'w:endnote',
+]);
 
 const eachParagraph = (
   parent: Element,
@@ -769,7 +722,19 @@ export const mainPartName = (parts: readonly ZipEntry[]): string => {
   return target;
 };
 
-export const resolveRuns = (parts: readonly ZipEntry[]): ResolvedRun[] => {
+// Styles, theme and page background are package-wide, so every part of one package resolves
+// against the same reading instead of parsing styles.xml once per header.
+export type CascadeContext = {
+  parts: readonly ZipEntry[];
+  mainName: string;
+  document: Element;
+  styles: Styles;
+  theme: Theme;
+  pageBackground: Colour;
+  showsBackgroundShape: boolean;
+};
+
+export const cascadeContextOf = (parts: readonly ZipEntry[]): CascadeContext => {
   const mainName = mainPartName(parts);
   const main = findPart(parts, mainName);
   if (main === null) {
@@ -777,7 +742,7 @@ export const resolveRuns = (parts: readonly ZipEntry[]): ResolvedRun[] => {
   }
 
   const base = dirOf(mainName);
-  const relsName = `${base}_rels/${mainName.slice(base.length)}.rels`;
+  const relsName = relsNameFor(mainName);
   const related = (suffix: string, fallback: string): ZipEntry | null =>
     findPart(parts, relationshipTarget(parts, relsName, base, suffix) ?? fallback);
 
@@ -790,13 +755,26 @@ export const resolveRuns = (parts: readonly ZipEntry[]): ResolvedRun[] => {
     themePart === null
       ? null
       : { colours: themeColoursOf(textOf(themePart)), mapping: mappingOf(settings) };
-  const styles = stylesOf(read(related('styles', `${base}styles.xml`)));
-  const showsBackgroundShape = onOff(childOf(settings, 'w:displayBackgroundShape')) ?? false;
-
   const document = parseTree(textOf(main), WORDPROCESSINGML_NAMESPACES);
-  const pageBackground = colourOf(childOf(document, 'w:background'), theme, BACKGROUND_KEYS);
-  const body = childOf(document, 'w:body') ?? document;
 
+  return {
+    parts,
+    mainName,
+    document,
+    styles: stylesOf(read(related('styles', `${base}styles.xml`))),
+    theme,
+    pageBackground: colourOf(childOf(document, 'w:background'), theme, BACKGROUND_KEYS),
+    showsBackgroundShape: onOff(childOf(settings, 'w:displayBackgroundShape')) ?? false,
+  };
+};
+
+export const resolveRunsIn = (
+  context: CascadeContext,
+  partName: string,
+  root: Element,
+  idPrefix = 'r',
+): ResolvedRun[] => {
+  const body = childOf(root, 'w:body') ?? root;
   const runs: ResolvedRun[] = [];
   let offset = 0;
   let index = 0;
@@ -812,26 +790,31 @@ export const resolveRuns = (parts: readonly ZipEntry[]): ResolvedRun[] => {
         return;
       }
       index += 1;
-      const source: SourceSpan = { part: mainName, start: offset, end: offset + text.length };
+      const source: SourceSpan = { part: partName, start: offset, end: offset + text.length };
       offset += text.length;
 
       runs.push(
         resolveRun({
-          id: `r${index}`,
+          id: `${idPrefix}${index}`,
           text,
           source,
-          layers: layersFor(styles, paragraphStyle, run),
+          layers: layersFor(context.styles, paragraphStyle, run),
           paragraphShd,
           cellShd,
-          theme,
-          pageBackground,
-          showsBackgroundShape,
+          theme: context.theme,
+          pageBackground: context.pageBackground,
+          showsBackgroundShape: context.showsBackgroundShape,
         }),
       );
     });
   });
 
   return runs;
+};
+
+export const resolveRuns = (parts: readonly ZipEntry[]): ResolvedRun[] => {
+  const context = cascadeContextOf(parts);
+  return resolveRunsIn(context, context.mainName, context.document, 'r');
 };
 
 export const styledRunsOf = (runs: readonly ResolvedRun[]): StyledRun[] =>
