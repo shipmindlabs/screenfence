@@ -92,3 +92,20 @@ export type {
   ResolvedRun,
   UnknownReason,
 } from './docx/cascade.ts';
+export {
+  NOT_CHECKED_KINDS,
+  PART_UNKNOWN_REASONS,
+  RUN_ORIGINS,
+  readDocx,
+  readParts,
+  styledPartRuns,
+} from './docx/parts.ts';
+export type {
+  DocxCoverage,
+  DocxReading,
+  DocxRun,
+  NotCheckedItem,
+  NotCheckedKind,
+  PartUnknownReason,
+  RunOrigin,
+} from './docx/parts.ts';
