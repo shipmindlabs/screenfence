@@ -123,6 +123,60 @@ hands the document to a person. `ResolvedRun.unknown` names the reasons.
 | `condensed-spacing` | `w:spacing` condenses by more than half the font size |
 | `raised-text` | `w:position` moves the run beyond twice the font size |
 
+### Parts beyond the main document
+
+`word/document.xml` is not the whole document. `readDocx` walks every part reachable from
+`_rels/.rels` and from the main part's own relationships, and says for each one where its text
+belongs. It is exported from the `screenfence/docx` subpath and returns the runs plus the coverage
+`route` reads.
+
+```ts
+import { phraseFindings, phraseScopes, route, separateLayers } from 'screenfence';
+import { readDocx, styledPartRuns } from 'screenfence/docx';
+
+const { runs, coverage } = await readDocx(bytes);
+const layers = separateLayers(styledPartRuns(runs));
+const decision = route(phraseFindings(phraseScopes(layers)), coverage);
+```
+
+Every run carries an `origin` alongside its style, so a reviewer reads where the text was found
+rather than only what it said.
+
+| Part or element | `origin` | Where its text goes |
+| --- | --- | --- |
+| header, footer, footnotes, endnotes | `rendered` | through the cascade, under the part's own name |
+| comments, the glossary document | `not-rendered` | hidden layer, one run per `w:p` |
+| `customXml` items, `docProps/core.xml`, `docProps/app.xml` | `not-rendered` | hidden layer, one run per text node |
+| `w:delText`, `w:instrText` | `not-rendered` | hidden layer |
+| `descr` and `title` on `wp:docPr` | `not-rendered` | hidden layer |
+| `w:txbxContent` | `textbox` | unknown layer, reason `textbox-content` |
+| `mc:AlternateContent` whose `mc:Choice` and `mc:Fallback` read differently | `alternate-content` | unknown layer, reason `alternate-content-differs`, both texts kept |
+
+A header keeps its own part name in `source.part`, so a phrase found in `word/header2.xml` is
+reported there and not against the body. Deleted text, field instructions and drawing alt text are
+collected from every part that goes through the cascade, not only from the main one.
+
+An instruction that sits only in a comment is therefore in the hidden layer, and `route` hands the
+document to a person: a comment is not rendered, so it is never weighed against the visible page. A
+textbox is the other way round — Word draws it, and whether a reader sees it is a question about
+page geometry — so its text goes to the unknown layer instead of being called visible or hidden.
+The two readings of an `mc:AlternateContent` go the same way, both kept, because the part that a
+screener parses is not the part that Word shows.
+
+A relationship to a target outside the package is skipped, and so is one naming a part the archive
+does not carry. Each part is visited once, so a header shared by three sections is read once.
+
+Images, embedded objects and `w:altChunk` are not read, and they are not passed over in silence
+either: each is added to `coverage.notChecked` as `{ kind, part, name }`, where `name` is the
+relationship id or the target it was found under. The rest of `coverage` is the ordinary `styled`
+and `unknownRuns` pair.
+
+| Kind | From |
+| --- | --- |
+| `image` | an image or thumbnail relationship, `a:blip`, `v:imagedata` |
+| `embedded-object` | an `oleObject` or `package` relationship, `w:object`, `w:embedObject` |
+| `alt-chunk` | an `aFChunk` relationship, `w:altChunk` |
+
 ## Invisible code points
 
 `scanCodePoints(text)` walks the text one code point at a time and reports every character a reader
