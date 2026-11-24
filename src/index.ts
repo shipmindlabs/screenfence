@@ -52,6 +52,24 @@ export type {
   RouteKind,
 } from './route.ts';
 export {
+  RESOLUTION_REFUSAL_CODES,
+  ResolutionRefusal,
+  UnresolvedVisibilityError,
+  VISIBILITY_VERDICTS,
+  documentOf,
+  exportVisible,
+  resolveUnknown,
+  unresolvedRunIds,
+} from './export.ts';
+export type {
+  ExportSegment,
+  ResolutionRefusalCode,
+  VisibilityDecision,
+  VisibilityDocument,
+  VisibilityVerdict,
+  VisibleExport,
+} from './export.ts';
+export {
   ZIP_LIMITS,
   ZIP_REFUSAL_CODES,
   ZipRefusal,

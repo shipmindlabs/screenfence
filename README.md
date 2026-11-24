@@ -332,6 +332,47 @@ against a candidate.
 runs, not page geometry. A plain-text input adds `layer-separation`, because there are no styles to
 separate.
 
+## The visible export
+
+`exportVisible(doc)` is how the visible page leaves screenfence, and it does not leave while a run
+is still unreadable. A document is the styled runs plus the decisions people have made about them:
+`documentOf(runs)` starts one with no decisions, and `unresolvedRunIds(doc)` names the runs that
+are still waiting.
+
+```ts
+import { documentOf, exportVisible, resolveUnknown, unresolvedRunIds } from 'screenfence';
+
+const doc = documentOf(runs);
+unresolvedRunIds(doc); // ['r2']
+
+const resolved = resolveUnknown(doc, [
+  { runId: 'r2', as: 'hidden', by: 'dana@example.com', at: '2026-05-04T10:15:00Z' },
+]);
+
+exportVisible(resolved).text; // 'Dear hiring team,'
+```
+
+While any run sits in the unknown layer without a decision, `exportVisible` throws
+`UnresolvedVisibilityError` and the error lists those run ids, so the caller learns what is
+missing rather than receiving a shortened page. A document with no unknown runs exports with no
+decisions at all.
+
+The export carries the visible text plus one segment per exported run —
+`{ runId, text, source, start, end, decision }` — so every character maps back to the
+`{ part, start, end }` span it came from, and a run that a person let through names the decision
+that did it. A run resolved as `hidden` is not in the text and not in the segments.
+
+`resolveUnknown(doc, decisions)` takes one decision per run and returns a new document; the one it
+was given is not touched, and a refused call records nothing. There is no default, no bulk flag and
+no option that resolves a run without a named person deciding it.
+
+| Refused | `code` |
+| --- | --- |
+| the id names no run in the document | `no-such-run` |
+| the run is not in the unknown layer | `not-unknown-run` |
+| `by` is empty or only whitespace | `no-decider` |
+| a second decision for a run already resolved | `already-decided` |
+
 ## Tests
 
 ```sh
