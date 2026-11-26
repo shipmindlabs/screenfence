@@ -70,6 +70,23 @@ export type {
   VisibleExport,
 } from './export.ts';
 export {
+  CODE_POINTS_RULESET,
+  EVIDENCE_SCHEMA,
+  INPUT_KINDS,
+  PHRASES_RULESET,
+  buildEvidence,
+  explainForCandidate,
+} from './evidence.ts';
+export type {
+  EvidenceCounts,
+  EvidenceFinding,
+  EvidenceRecord,
+  EvidenceRoute,
+  EvidenceRulesets,
+  InputKind,
+  InspectedDocument,
+} from './evidence.ts';
+export {
   ZIP_LIMITS,
   ZIP_REFUSAL_CODES,
   ZipRefusal,
