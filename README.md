@@ -373,6 +373,56 @@ no option that resolves a run without a named person deciding it.
 | `by` is empty or only whitespace | `no-decider` |
 | a second decision for a run already resolved | `already-decided` |
 
+## The evidence record
+
+`buildEvidence(doc, route, { at })` writes down what the check did, in a form the candidate whose
+document it was can be shown. The time comes from the caller alone: the module reads no clock,
+opens no connection and stores nothing, so inspecting the same bytes twice gives byte-identical
+JSON. Keys are sorted at every level of the record, so `JSON.stringify` is enough to compare two
+records.
+
+```ts
+import {
+  buildEvidence,
+  explainForCandidate,
+  phraseFindings,
+  phraseScopes,
+  route,
+  separateLayers,
+} from 'screenfence';
+import { readDocx, styledPartRuns } from 'screenfence/docx';
+
+const { runs, coverage } = await readDocx(bytes);
+const styled = styledPartRuns(runs);
+const findings = phraseFindings(phraseScopes(separateLayers(styled)));
+const doc = { kind: 'docx', runs: styled, decisions: [], findings } as const;
+
+const record = await buildEvidence(doc, route(findings, coverage), {
+  at: '2026-05-04T10:15:00Z',
+});
+
+explainForCandidate(record); // plain English, the same text every time
+```
+
+| Field | What it holds |
+| --- | --- |
+| `schema` | `screenfence.evidence/1` |
+| `at` | the time the caller passed, verbatim |
+| `rulesets` | what produced the findings: `codePoints`, `phrases`, `layers` and the `contrastThreshold` |
+| `input` | the input `kind` (`docx` or `text`) and the parts its runs came from |
+| `visibleText` | the number of characters of visible text and its SHA-256, taken through `crypto.subtle` |
+| `findings` | every finding with its `part`, `runId` and `offset`, or `null` where no place was recorded |
+| `route` | `kind`, `priority`, how many findings caused it, and the `checked` / `notChecked` pair |
+| `undecided` | the unknown runs still waiting for a person |
+| `decisions` | the readings people have recorded, sorted by run id |
+| `counts` | characters and runs per layer, and findings per tier |
+
+`explainForCandidate(record)` renders the record and nothing else: it lists each finding by
+location and by what was recorded against it, gives the character counts per layer, names the runs
+waiting for a person and any reading a person has already recorded, says whether the document was
+sent on for review and at what priority, and closes by stating that this check never rejects a
+document.
+
 ## Tests
 
 ```sh
